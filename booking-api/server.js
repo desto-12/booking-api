@@ -1,3 +1,5 @@
+require('dotenv').config();
+
 // Import the required modules
 const express = require('express');
 const mysql = require('mysql2');
@@ -9,12 +11,13 @@ const PORT = 3000;
 // Middleware to parse JSON bodies
 app.use(express.json());
 
-// Configure your database connection
+// Configure your database connection using environment variables
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'desto12',        // Replace with your database user
-  password: 'Temitope12@', // Replace with your database password
-  database: 'my_database'     // Replace with your database name
+  host: process.env.DB_HOST,           
+  user: process.env.DB_USER,           
+  password: process.env.DB_PASSWORD,   
+  database: process.env.DB_DATABASE,       
+  port: process.env.DB_PORT || 3306,   
 });
 
 // Connect to the database
@@ -31,110 +34,42 @@ app.get('/', (req, res) => {
   res.send('Booking API is running!');
 });
 
-// Start the server
-app.listen(PORT, () => {
-  console.log(`Server is running on port ${PORT}`);
-});
 // POST endpoint to create a new booking
 app.post('/api/book', (req, res) => {
-  // Extract booking details from the request body
-  const {
-    name,
-    email,
-    phone,
-    business_type,
-    booking_date,
-    booking_time
-  } = req.body;
+  const { name, email, phone, business_type, booking_date, booking_time } = req.body;
 
   // Basic validation: ensure required fields are provided
   if (!name || !email || !booking_date || !booking_time) {
     return res.status(400).json({ error: 'Missing required booking information.' });
   }
 
-  // SQL query to insert a new booking into the 'bookings' table
   const bookingQuery = `
     INSERT INTO bookings (name, email, phone, business_type, booking_date, booking_time)
     VALUES (?, ?, ?, ?, ?, ?)
   `;
 
-  // Execute the query
-  db.query(
-    bookingQuery,
-    [name, email, phone, business_type, booking_date, booking_time],
-    (err, result) => {
-      if (err) {
-        console.error('Error inserting booking:', err);
-        return res.status(500).json({ error: 'Failed to create booking.' });
-      }
-      
-      // Update the corresponding slot in the availability table as booked
-      const updateSlotQuery = `
-        UPDATE availability 
-        SET is_booked = TRUE 
-        WHERE available_date = ? AND available_time = ?
-      `;
-      db.query(updateSlotQuery, [booking_date, booking_time], (err) => {
-        if (err) {
-          console.error('Error updating slot availability:', err);
-          return res.status(500).json({ error: 'Booking created but failed to update slot availability.' });
-        }
-        
-        // Respond with a success message
-        res.status(200).json({ message: 'Booking created successfully.' });
-      });
+  db.query(bookingQuery, [name, email, phone, business_type, booking_date, booking_time], (err, result) => {
+    if (err) {
+      console.error('Error inserting booking:', err);
+      return res.status(500).json({ error: 'Failed to create booking.' });
     }
-  );
-});
 
-app.post('/api/book', (req, res) => {
-  console.log('Received booking request:', req.body); // Log the incoming request body
-
-  // For now, respond with a test message to confirm the route is hit.
-  res.status(200).json({ message: 'Test response - Route is working!' });
-});
-const port = 4000;
-app.listen(port, () => {
-  console.log(`Server is running on port ${port}`);
-});
-app.post('/api/book', (req, res) => {
-  const { name, email, phone, business_type, booking_date, booking_time } = req.body;
-
-  // Basic validation
-  if (!name || !email || !booking_date || !booking_time) {
-    return res.status(400).json({ error: 'Missing required booking information.' });
-  }
-
-  const bookingQuery = `
-    INSERT INTO bookings (name, email, phone, business_type, booking_date, booking_time)
-    VALUES (?, ?, ?, ?, ?, ?)
-  `;
-
-  db.query(
-    bookingQuery,
-    [name, email, phone, business_type, booking_date, booking_time],
-    (err, result) => {
+    const updateSlotQuery = `
+      UPDATE availability
+      SET is_booked = TRUE
+      WHERE available_date = ? AND available_time = ?
+    `;
+    db.query(updateSlotQuery, [booking_date, booking_time], (err) => {
       if (err) {
-        console.error('Error inserting booking:', err);
-        return res.status(500).json({ error: 'Failed to create booking.' });
+        console.error('Error updating slot availability:', err);
+        return res.status(500).json({ error: 'Booking created but failed to update slot availability.' });
       }
-      
-      const updateSlotQuery = `
-        UPDATE availability 
-        SET is_booked = TRUE 
-        WHERE available_date = ? AND available_time = ?
-      `;
-      db.query(updateSlotQuery, [booking_date, booking_time], (err) => {
-        if (err) {
-          console.error('Error updating slot availability:', err);
-          return res.status(500).json({ error: 'Booking created but failed to update slot availability.' });
-        }
-        
-        res.status(200).json({ message: 'Booking created successfully.' });
-      });
-    }
-  );
+
+      res.status(200).json({ message: 'Booking created successfully.' });
+    });
+  });
 });
+
 // Get all bookings
 app.get('/api/bookings', (req, res) => {
   const query = 'SELECT * FROM bookings';
@@ -148,6 +83,7 @@ app.get('/api/bookings', (req, res) => {
     res.status(200).json(results);
   });
 });
+
 // Check if a slot is available
 app.get('/api/availability', (req, res) => {
   const { booking_date, booking_time } = req.query;
@@ -170,3 +106,7 @@ app.get('/api/availability', (req, res) => {
   });
 });
 
+// Start the server
+app.listen(PORT, () => {
+  console.log(`Server is running on port ${PORT}`);
+});
